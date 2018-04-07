@@ -1,9 +1,17 @@
+
 //
 //  Controller.h
 //  Source written by Justin Yu
 //
 
 #include <kipr/botball.h>
+
+#define LEFT_MOTOR_CORRECTION 1
+#define RIGHT_MOTOR_CORRECTION 1
+
+#define ET_LEFT 1
+#define ET_RIGHT 2
+#define ET_THRESHOLD 2000 // Calibration
 
 /**
  * Controller
@@ -197,3 +205,13 @@ extern Controller new_controller(int motor_left, int motor_right,
 extern Controller new_create_controller();
 
 Controller controller; // global wallaby instance
+
+enum Side {
+	Left,
+    Right
+};
+
+void line_follow(int cm, enum Side side);
+int line_follow_with_camera(enum Side line_side, enum Side et_side);
+void forward_accel(int cm);
+void backward_accel(int cm);

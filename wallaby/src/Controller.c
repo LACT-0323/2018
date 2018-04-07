@@ -117,8 +117,8 @@ static void left(int angle, float radius, int speed) {
         msleep(50);
     }
 
-    off(controller.motor_left);
-    off(controller.motor_right);
+    freeze(controller.motor_left);
+    freeze(controller.motor_right);
 }
 
 
@@ -155,8 +155,8 @@ static void right(int angle, float radius, int speed) {
         msleep(50);
     }
 
-    off(controller.motor_left);
-    off(controller.motor_right);
+    freeze(controller.motor_left);
+    freeze(controller.motor_right);
 }
 
 // FIX THIS
@@ -252,7 +252,76 @@ Controller new_create_controller() {
     return instance;
 }
 
-void line_follow(int cm) {
+int check_yellow() {
+    camera_update();
+    camera_update();
+
+    int i;
+    float avg = 0;
+    for(i = 0; i < 30; i++) {
+        camera_update();
+        avg += get_object_area(0, 0);
+        msleep(50);
+    }
+    avg /= (float)i;
+
+    if(avg > 1500) {
+          // yellow
+        printf("yellow: %d\n", avg);
+        return 1;
+    } else {
+        printf("yellow not there: %d\n", avg);
+        return 0;
+    }
+}
+
+float *line_follow_step(enum Side line_side, float params[2]) {
+    // TODO: make these constants
+    int tophat = 0;
+    float kp = .6, // proportionality constant .003 //2.4
+    ki = 0.1,  // integral constant .1 //.1
+    kd = 1; // derivative constant 1 //8.2
+    int low, high;
+    float offset = 700; // TODO: add calibration
+    int tp = 1100; // speed of motors at error = 0
+    float integral = params[0]; // running total of errors
+    float last_error = params[1];
+    float derivative = 0; // current error - last error
+
+    int sensor_value, turn;
+    float error;
+
+    sensor_value = analog(tophat);
+    error = sensor_value - offset;
+    integral = (7. / 8.) * integral + error;
+    derivative = error - last_error;
+    turn = (int)(kp * error + ki * integral + kd * derivative) / 2;
+    mav(controller.motor_right, tp + turn * (line_side == Left ? 1 : -1));
+    mav(controller.motor_left, tp - turn * (line_side == Left ? 1 : -1));
+    last_error = error;
+
+    float output[] = {integral, last_error};
+    return output;
+}
+
+void line_follow(int cm, enum Side line_side) {
+    /*
+    int distance = CMtoBEMF(cm);
+
+    cmpc(controller.motor_left);
+    cmpc(controller.motor_right);
+
+    float initial[] = {0, 0};
+    float *params = line_follow_step(line_side, initial);
+    while(abs(gmpc(controller.motor_left)) < distance || abs(gmpc(controller.motor_right)) < distance) {
+		params = line_follow_step(line_side, params);
+        msleep(1);
+    }
+
+    freeze(controller.motor_left);
+    freeze(controller.motor_right);
+    */
+
     // initialize variables
 
     int distance = CMtoBEMF(cm);
@@ -262,7 +331,7 @@ void line_follow(int cm) {
 
     // PID
 
-    float kp = .8, // proportionality constant .003 //2.4
+    float kp = .7, // proportionality constant .003 //2.4
     ki = 0.1,  // integral constant .1 //.1
     kd = 1; // derivative constant 1 //8.2
     int low, high;
@@ -282,91 +351,121 @@ void line_follow(int cm) {
         integral = (7. / 8.) * integral + error;
         derivative = error - last_error;
         turn = (int)(kp * error + ki * integral + kd * derivative) / 2;
-        mav(controller.motor_right, tp + turn);
-        mav(controller.motor_left, tp - turn);
+        mav(controller.motor_right, tp + turn * (line_side == Left ? 1 : -1));
+        mav(controller.motor_left, tp - turn * (line_side == Left ? 1 : -1));
         last_error = error;
         msleep(1);
-        if(abs(gmpc(controller.motor_left)) > distance || abs(gmpc(controller.motor_right)) > distance)
+        if(abs(gmpc(controller.motor_left)) > distance || abs(gmpc(controller.motor_right)) > distance) {
+            freeze(controller.motor_left);
+            freeze(controller.motor_right);
             break;
+        }
     }
 }
 
-void forward_gyro(int cm) {
+int line_follow_with_camera(enum Side line_side, enum Side et_side) {
     // initialize variables
 
-    int distance = CMtoBEMF(cm);
-    printf("%d\n", distance);
     int tophat = 0;
-    int et = 1, et_threshold = 1700; // greater than 1600 means that the pole is there
 
     // PID
 
-    float kp = 0.5, // proportionality constant .003 //2.4
+    float kp = .7, // proportionality constant .003 //2.4
     ki = 0.1,  // integral constant .1 //.1
-    kd = 0.4; // derivative constant 1 //8.2
+    kd = 1; // derivative constant 1 //8.2
     int low, high;
+    float offset = 700; // average of white and black sensor values (660, 985) = 822.5
     int tp = 1100; // speed of motors at error = 0
     float integral = 0; // running total of errors
     float last_error = 0;
     float derivative = 0; // current error - last error
 
-    float avg_straight = 34.5; // average value of gyro_x going straight
-    // if > avg_straight, drifting LEFT
-    // if < avg_straight, drifting RIGHT
-    int turn = 0;
-    int i;
+    int sensor_value, turn;
     float error;
-    cmpc(controller.motor_left);
-    cmpc(controller.motor_right);
-    float avg_x;
+
     while(1) {
-        // sensor_value = accel_y();
-        //printf("gyro_x: %d, gyro_y: %d\n", gyro_x(), gyro_y());
-        avg_x = 0;
-        derivative = 0;
-        // take avg
-        float num_samples = 50.;
-        for(i = 0; i < (int)num_samples; i++) {
-            int temp = accel_x();
-            if(abs(temp - 45) < 40 || abs(temp - 29) < 40) {
-            	avg_x += temp;
-            } else {
-                num_samples -= 1;
-            }
-            msleep(1);
-        }
-        avg_x /= num_samples;
-
-        error = avg_x - avg_straight;
-        integral = (5. / 8.) * integral + error;
+        // check camera
+        sensor_value = analog(tophat);
+        error = sensor_value - offset;
+        integral = (7. / 8.) * integral + error;
         derivative = error - last_error;
-        turn = (int)(kp * error + ki * integral + kd * derivative);
-
-        mav(controller.motor_right, tp - turn * 3);
-        mav(controller.motor_left, tp + turn * 3);
+        turn = (int)(kp * error + ki * integral + kd * derivative) / 2;
+        mav(controller.motor_right, tp + turn * (line_side == Left ? 1 : -1));
+        mav(controller.motor_left, tp - turn * (line_side == Left ? 1 : -1));
         last_error = error;
+        msleep(1);
 
-        if(abs(gmpc(controller.motor_left)) > distance || abs(gmpc(controller.motor_right)) > distance) {
+        if(analog(et_side == Left ? ET_LEFT : ET_RIGHT) > ET_THRESHOLD) {
             freeze(controller.motor_left);
             freeze(controller.motor_right);
             break;
         }
     }
+
+    return check_yellow();
 }
 
-void backward_gyro(int cm) {
-    int distance = CMtoBEMF(cm);
+void line_follow_until_ET(enum Side line_side, enum Side et_side) {
+
+    int tophat = 0;
+
+    float kp = .7, // proportionality constant .003 //2.4
+    ki = 0.1,  // integral constant .1 //.1
+    kd = 1; // derivative constant 1 //8.2
+    int low, high;
+    float offset = 700; // average of white and black sensor values (660, 985) = 822.5
+    int tp = 1100; // speed of motors at error = 0
+    float integral = 0; // running total of errors
+    float last_error = 0;
+    float derivative = 0; // current error - last error
+
+    int sensor_value, turn;
+    float error;
+    cmpc(controller.motor_left);
+    cmpc(controller.motor_right);
+    while(1) {
+        sensor_value = analog(tophat);
+        error = sensor_value - offset;
+        integral = (7. / 8.) * integral + error;
+        derivative = error - last_error;
+        turn = (int)(kp * error + ki * integral + kd * derivative) / 2;
+        mav(controller.motor_right, tp + turn * (line_side == Left ? 1 : -1));
+        mav(controller.motor_left, tp - turn * (line_side == Left ? 1 : -1));
+        last_error = error;
+        msleep(1);
+        if(analog(et_side == Left ? ET_LEFT : ET_RIGHT) > ET_THRESHOLD) {
+            freeze(controller.motor_left);
+            freeze(controller.motor_right);
+            break;
+        }
+    }
+
+    /*
+    float initial[] = {0, 0};
+    float *params = line_follow_step(line_side, initial);
+	while(analog(et_side == Left ? ET_LEFT : ET_RIGHT) < ET_THRESHOLD) {
+		params = line_follow_step(line_side, params);
+    }
+
+    freeze(controller.motor_left);
+    freeze(controller.motor_right);
+    */
+}
+
+void forward_accel(int cm) {
+    // initialize variables
+    int distance = CMtoBEMF(abs(cm));
     printf("%d\n", distance);
     int tophat = 0;
-    int et = 1, et_threshold = 1700; // greater than 1600 means that the pole is there
 
     // PID
-
-    float kp = 0.5, // proportionality constant .003 //2.4
+    float kp = 0.8, // proportionality constant .5
     ki = 0.1,  // integral constant .1 //.1
     kd = 0.4; // derivative constant 1 //8.2
-    int low, high;
-    int tp = -1100; // speed of motors at error = 0
+    int tp = 1100; // speed of motors at error = 0
+    if(cm < 0) {
+       tp *= -1;
+    }
     float integral = 0; // running total of errors
     float last_error = 0;
     float derivative = 0; // current error - last error
@@ -386,10 +485,10 @@ void backward_gyro(int cm) {
         avg_x = 0;
         derivative = 0;
         // take avg
-        float num_samples = 50.;
+        float num_samples = 100.;
         for(i = 0; i < (int)num_samples; i++) {
             int temp = accel_x();
-            if(abs(temp - 45) < 40 || abs(temp - 29) < 40) {
+            if(abs(temp - 45) < 30 || abs(temp - 29) < 30) {
             	avg_x += temp;
             } else {
                 num_samples -= 1;
@@ -403,8 +502,8 @@ void backward_gyro(int cm) {
         derivative = error - last_error;
         turn = (int)(kp * error + ki * integral + kd * derivative);
 
-        mav(controller.motor_right, tp + turn * 3);
-        mav(controller.motor_left, tp - turn * 3);
+        mav(controller.motor_right, (tp * (cm < 0 ? 0.93 : 0.98) - turn * 4 * (cm < 0 ? -1 : 1)));
+        mav(controller.motor_left, (tp + turn * 4 * (cm < 0 ? -1 : 1)));
         last_error = error;
 
         if(abs(gmpc(controller.motor_left)) > distance || abs(gmpc(controller.motor_right)) > distance) {
@@ -413,4 +512,8 @@ void backward_gyro(int cm) {
             break;
         }
     }
+}
+
+void backward_accel(int cm) {
+    forward_accel(-cm);
 }
