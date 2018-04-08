@@ -12,10 +12,11 @@
 #define ARM_DOWN 0
 #define FRISBEE_SERVO 1
 #define FRISBEE_LOW 400
-#define FRISBEE_MID 1750
-#define FRISBEE_UP 2047
+#define FRISBEE_MID 1389
+#define FRISBEE_UP 1800
 #define ET_LEFT 1
 #define ET_RIGHT 2
+#define TOPHAT 0
 
 void open_claw() {
     controller.servo(CLAW_SERVO, CLAW_OPEN);
@@ -61,11 +62,32 @@ enum Position {
     Third
 };
 
+void lower_frisbee_slow() {
+	controller.slow_servo(FRISBEE_SERVO, 800, 3.0);
+}
+
+void knock_cube() {
+    controller.servo(FRISBEE_SERVO, 1200);
+    msleep(150);
+    thread tid = thread_create(lower_frisbee_slow);
+    thread_start(tid);
+    backward_accel(20);
+    thread_wait(tid);
+    thread_destroy(tid);
+    raise_frisbee();
+    forward_accel(10);
+}
+
 int main()
 {
 	controller = new_controller(0, 1, 7.6, 2);
 
-	camera_open_black();
+    controller.servo(CLAW_SERVO, CLAW_MEDIUM);
+    controller.servo(ARM_SERVO, ARM_DOWN);
+    controller.servo(FRISBEE_SERVO, FRISBEE_LOW);
+    controller.enable_servos();
+
+	/*camera_open_black();
 
     // msleep(2000);
     // determine_color();
@@ -75,11 +97,6 @@ int main()
         camera_update();
         msleep(100);
     }
-
-    controller.servo(CLAW_SERVO, CLAW_MEDIUM);
-    controller.servo(ARM_SERVO, ARM_DOWN);
-    controller.servo(FRISBEE_SERVO, FRISBEE_LOW);
-    controller.enable_servos();
 
     forward_accel(10);
     int first_position = line_follow_with_camera(Right, Left);
@@ -122,11 +139,6 @@ int main()
         controller.right(20, 0, 400);
         backward_accel(9);
         controller.right(30, 0, 400);
-        open_claw_wide();
-        msleep(1000);
-        controller.forward(6, 400);
-        msleep(1000);
-        backward_accel(10);
     }
     else if(position == Second) {
         controller.left(90, 0, 1000);
@@ -140,12 +152,6 @@ int main()
         controller.left(20, 0, 400);
         backward_accel(9);
         controller.left(30, 0, 400);
-
-		open_claw_wide();
-        msleep(1000);
-        controller.forward(6, 400);
-        msleep(1000);
-        backward_accel(10);
     }
     else if(position == Third) {
         controller.left(90, 0, 1000);
@@ -162,12 +168,52 @@ int main()
         controller.left(20, 0, 400);
         backward_accel(9);
         controller.left(30, 0, 400);
+    }
 
-		open_claw_wide();
-        msleep(1000);
-        controller.forward(6, 400);
-        msleep(1000);
-        backward_accel(10);
+    open_claw_wide();
+    msleep(1000);
+    controller.forward(6, 400);
+    msleep(1000);
+    backward_accel(10);
+    */
+    enum Position position = Second;
+    close_claw();
+    mav(controller.motor_left, -930);
+    mav(controller.motor_right, -1000);
+    while(analog(TOPHAT) < 1000) {
+       msleep(100);
+    }
+
+    if(position == First || position == Second) {
+        controller.left(90, 0, 1000);
+   		open_claw_wide();
+        line_follow(position == First ? 10 : 45, Right);
+        controller.left(92, 0, 1000);
+        forward_accel(20);
+        raise_frisbee();
+        controller.right(40, 0, -1000);
+        close_claw();
+        forward_accel(6);
+        controller.right(52, 0, -1000);
+        backward_accel(20);
+        forward_until_ET(1100, Right);
+        msleep(500);
+        backward_accel(4);
+        controller.left(91, 0, 1000);
+        get_multiplier();
+        close_claw();
+        mav(controller.motor_left, 900);
+    	mav(controller.motor_right, 1000);
+        while(analog(TOPHAT) < 1000) {
+           msleep(1);
+        }
+        controller.right(93, 0, 1000);
+        line_follow(position == First ? 20 : 40, Right);
+        controller.right(92, 0, 1000);
+        backward_accel(20);
+        lower_frisbee();
+    }
+    else if(position == Third) {
 
     }
 
