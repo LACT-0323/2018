@@ -6,7 +6,7 @@
 #define CLAW_OPEN 1380
 #define CLAW_VERY_OPEN 850
 #define CLAW_CLOSED 2047
-#define CLAW_MEDIUM 1700
+#define CLAW_MEDIUM 1700 //the quick brown fox jumped over the lazy dog
 #define ARM_SERVO 1
 #define ARM_UP 1400
 #define ARM_DOWN 0
@@ -17,6 +17,7 @@
 #define ET_LEFT 1
 #define ET_RIGHT 2
 #define TOPHAT 0
+#define FRISBEE_FLAT 1350
 
 void open_claw() {
     controller.servo(CLAW_SERVO, CLAW_OPEN);
@@ -82,12 +83,12 @@ int main()
 {
 	controller = new_controller(0, 1, 7.6, 2);
 
-    controller.servo(CLAW_SERVO, CLAW_MEDIUM);
+    controller.servo(CLAW_SERVO, CLAW_VERY_OPEN);
     controller.servo(ARM_SERVO, ARM_DOWN);
     controller.servo(FRISBEE_SERVO, FRISBEE_LOW);
     controller.enable_servos();
 
-	/*camera_open_black();
+	camera_open_black();
 
     // msleep(2000);
     // determine_color();
@@ -97,6 +98,9 @@ int main()
         camera_update();
         msleep(100);
     }
+
+    controller.servo(CLAW_SERVO, CLAW_MEDIUM);
+    msleep(250);
 
     forward_accel(10);
     int first_position = line_follow_with_camera(Right, Left);
@@ -110,20 +114,23 @@ int main()
 
     open_claw();
     camera_close();
-    backward_accel(3);
+    msleep(100);
+    backward_accel(1);
+    msleep(100);
 
     controller.right(86, 0, 1000);
     forward_accel(19);
     line_follow(14, Left);
     msleep(500);
 
+    //enum Position position = Second;
     close_claw();
     msleep(500);
     backward_accel(20);
-    controller.right(56, 0, -1000);
+    controller.right(54, 0, -1000);
     backward_accel(18);
     raise_frisbee();
-    controller.left(56, 0, -1000);
+    controller.left(58, 0, -1000);
     backward_accel(20);
     forward_accel(4);
 
@@ -132,26 +139,22 @@ int main()
         lower_frisbee();
         line_follow_until_ET(Left, Right);
         forward_accel(12);
-        controller.left(15, 0, -400);
+        controller.left(30, 0, -400);
         backward_accel(5);
-        controller.right(15, 0, 400);
+        controller.left(30, 0, -400);
         backward_accel(2);
-        controller.right(20, 0, 400);
-        backward_accel(9);
-        controller.right(30, 0, 400);
+        controller.left(20, 0, -400);
     }
     else if(position == Second) {
         controller.left(90, 0, 1000);
         lower_frisbee();
         line_follow_until_ET(Right, Left);
         forward_accel(12);
-        controller.right(15, 0, -400);
-        backward_accel(5);
-        controller.left(15, 0, 400);
-        backward_accel(2);
-        controller.left(20, 0, 400);
-        backward_accel(9);
-        controller.left(30, 0, 400);
+        controller.right(30, 0, -400);
+        backward_accel(3);
+        controller.right(30, 0, -400);
+        backward_accel(1);
+        controller.right(20, 0, -400);
     }
     else if(position == Third) {
         controller.left(90, 0, 1000);
@@ -161,13 +164,11 @@ int main()
         line_follow_until_ET(Right, Left);
 
         forward_accel(12);
-        controller.right(15, 0, -400);
-        backward_accel(5);
-        controller.left(15, 0, 400);
-        backward_accel(2);
-        controller.left(20, 0, 400);
-        backward_accel(9);
-        controller.left(30, 0, 400);
+        controller.right(30, 0, -400);
+        backward_accel(3);
+        controller.right(30, 0, -400);
+        backward_accel(1);
+        controller.right(20, 0, -400);
     }
 
     open_claw_wide();
@@ -175,8 +176,7 @@ int main()
     controller.forward(6, 400);
     msleep(1000);
     backward_accel(10);
-    */
-    enum Position position = Second;
+
     close_claw();
     mav(controller.motor_left, -930);
     mav(controller.motor_right, -1000);
@@ -185,36 +185,84 @@ int main()
     }
 
     if(position == First || position == Second) {
-        controller.left(90, 0, 1000);
-   		open_claw_wide();
+        controller.left(92, 0, 1000);
         line_follow(position == First ? 10 : 45, Right);
         controller.left(92, 0, 1000);
+        open_claw_wide();
         forward_accel(20);
         raise_frisbee();
         controller.right(40, 0, -1000);
         close_claw();
-        forward_accel(6);
-        controller.right(52, 0, -1000);
+        forward_accel(4);
+        controller.right(50, 0, -1000);
         backward_accel(20);
         forward_until_ET(1100, Right);
         msleep(500);
         backward_accel(4);
         controller.left(91, 0, 1000);
         get_multiplier();
-        close_claw();
+		forward_accel(15);
+        controller.left(95, 0, -1000);
+        controller.backward(15, 500);
+        forward_accel(10);
+        controller.left(90, 0, 1000);
+
         mav(controller.motor_left, 900);
     	mav(controller.motor_right, 1000);
         while(analog(TOPHAT) < 1000) {
            msleep(1);
         }
+
         controller.right(93, 0, 1000);
-        line_follow(position == First ? 20 : 40, Right);
-        controller.right(92, 0, 1000);
-        backward_accel(20);
+        line_follow(position == First ? 20 : 35, Right);
+
+        controller.right(90, 0, 1000);
+        //controller.servo(FRISBEE_SERVO, FRISBEE_FLAT, 1);
+        backward_accel(25);
+        //raise_frisbee();
+        //msleep(500);
         lower_frisbee();
     }
     else if(position == Third) {
+        controller.right(92, 0, 1000);
+        line_follow(15, Left);
+        controller.right(92, 0, 1000);
+        forward_accel(15);
+        raise_frisbee();
 
+        controller.left(40, 0, -1000);
+        close_claw();
+        forward_accel(4);
+        controller.left(50, 0, -1000);
+        backward_accel(20);
+        forward_until_ET(1100, Left);
+        msleep(500);
+        backward_accel(4);
+        controller.right(91, 0, 1000);
+        get_multiplier();
+		forward_accel(15);
+        controller.right(95, 0, -1000);
+        controller.backward(15, 500);
+        forward_accel(10);
+        controller.right(90, 0, 1000);
+
+        mav(controller.motor_left, 900);
+    	mav(controller.motor_right, 1000);
+        while(analog(TOPHAT) < 1000) {
+           msleep(1);
+        }
+        backward_accel(5);
+
+        controller.left(94, 0, 1000);
+        line_follow(23, Left);
+
+        controller.left(96, 0, 1000);
+        //controller.servo(FRISBEE_SERVO, FRISBEE_FLAT, 1);
+        backward_accel(25);
+        //raise_frisbee();
+        //msleep(500);
+        controller.servo(FRISBEE_SERVO, 450);
+        msleep(500);
     }
 
     controller.servo(CLAW_SERVO, CLAW_VERY_OPEN);
